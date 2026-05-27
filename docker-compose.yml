@@ -1,0 +1,52 @@
+# pgvector-rag-stack
+# Infraestrutura Plug & Play: PostgreSQL 16 + pgvector
+# Autor: Gabriel Fernandes Carvalho (2320142)
+# Disciplina: Arquitetura de Software - UniEVANGELICA 2026.1 - APS 16
+
+services:
+  pgvector-db:
+    image: pgvector/pgvector:pg16
+    container_name: ia-vector-db
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-senha123}
+      POSTGRES_DB: ${POSTGRES_DB:-vector_db}
+      # Tuning leve para RAG / embeddings de 1536 dimensoes
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+      PGDATA: /var/lib/postgresql/data/pgdata
+
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+
+    volumes:
+      # Persistencia dos dados (12-Factor: Backing Services / stateful isolado)
+      - pg_data:/var/lib/postgresql/data
+      # Bootstrap automatico na primeira subida (executa apenas se PGDATA estiver vazio)
+      - ./init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-vector_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    # Limite suave de recursos para evitar contencao na maquina local
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.5"
+
+    networks:
+      - rag-net
+
+networks:
+  rag-net:
+    driver: bridge
+
+volumes:
+  pg_data:
+    driver: local
